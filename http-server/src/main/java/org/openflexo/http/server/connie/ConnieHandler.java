@@ -35,13 +35,16 @@
 
 package org.openflexo.http.server.connie;
 
+import io.vertx.core.Handler;
+import io.vertx.core.http.ServerWebSocket;
+import io.vertx.core.http.WebSocketFrame;
+import io.vertx.core.json.DecodeException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
-
 import org.openflexo.connie.Bindable;
 import org.openflexo.connie.BindingEvaluationContext;
 import org.openflexo.connie.DataBinding;
@@ -49,33 +52,26 @@ import org.openflexo.connie.binding.BindingValueChangeListener;
 import org.openflexo.connie.exception.NotSettableContextException;
 import org.openflexo.connie.exception.NullReferenceException;
 import org.openflexo.connie.exception.TypeMismatchException;
-import org.openflexo.foundation.FlexoObject;
-import org.openflexo.foundation.FlexoServiceManager;
-import org.openflexo.foundation.resource.FlexoResource;
-import org.openflexo.http.server.core.TechnologyAdapterRouteService;
+import org.openflexo.http.server.ObjectFinder;
+import org.openflexo.http.server.json.JsonSerializer;
 import org.openflexo.http.server.util.IdUtils;
-import org.openflexo.http.server.util.ResourceUtils;
-
-import io.vertx.core.Handler;
-import io.vertx.core.http.ServerWebSocket;
-import io.vertx.core.http.WebSocketFrame;
-import io.vertx.core.json.DecodeException;
 
 /**
  * WebSocket service to evaluate Connie expressions
  */
 public class ConnieHandler implements Handler<ServerWebSocket> {
 
-	private final FlexoServiceManager serviceManager;
-	private final TechnologyAdapterRouteService taRouteService;
+	private final ObjectFinder finder;
+
+	private final JsonSerializer serializer;
 
 	private final Map<BindingId, DataBinding<Object>> compiledBindings = new WeakHashMap<>();
 
 	private final Set<ClientConnection> clients = new HashSet<>();
 
-	public ConnieHandler(FlexoServiceManager serviceManager, TechnologyAdapterRouteService taRouteService) {
-		this.serviceManager = serviceManager;
-		this.taRouteService = taRouteService;
+	public ConnieHandler(ObjectFinder finder, JsonSerializer serializer) {
+		this.finder = finder;
+		this.serializer = serializer;
 	}
 
 	private DataBinding<Object> getOrCreateBinding(final BindingId id) {
@@ -112,14 +108,7 @@ public class ConnieHandler implements Handler<ServerWebSocket> {
 			String objectUrl = url.substring(indexOfInfix + objectInfix.length());
 
 			String resourceUri = IdUtils.decodeId(resourceId);
-			FlexoResource<?> resource = serviceManager.getResourceManager().getResource(resourceUri);
-			ResourceUtils.safeGetResourceOrNull(resource);
-			if (resource != null) {
-				FlexoObject object = resource.findObject(objectUrl, null, null);
-				if (type.isInstance(object)) {
-					return type.cast(object);
-				}
-			}
+			return finder.find(type, resourceId, objectUrl);
 		}
 		return null;
 	}
@@ -127,7 +116,7 @@ public class ConnieHandler implements Handler<ServerWebSocket> {
 	private Bindable getOrCreateBindable(BindingId id) {
 		Bindable bindable = findObject(id.contextUrl, Bindable.class);
 
-		if (id.extensions != null && id.extensions.size() > 0) {
+		if (id.extensions.size() > 0) {
 			Map<String, Object> objects = new HashMap<>();
 			for (Map.Entry<String, String> entry : id.extensions.entrySet()) {
 				objects.put(entry.getKey(), findObject(entry.getValue(), Object.class));
@@ -244,7 +233,6 @@ public class ConnieHandler implements Handler<ServerWebSocket> {
 					try {
 						Object value = binding.getBindingValue(context);
 						response.result = toJson(value, request.detailed);
-						;
 					} catch (TypeMismatchException | NullReferenceException | InvocationTargetException e) {
 						String error = "Can't evaluate binding" + request.runtimeBinding + ": " + e;
 						System.out.println(error);
@@ -288,7 +276,7 @@ public class ConnieHandler implements Handler<ServerWebSocket> {
 
 				if (leftContext != null) {
 
-					Object newValue = null;
+					Object newValue;
 					RuntimeBindingId right = request.right;
 					if (right != null) {
 						// uses binding for new value
@@ -389,6 +377,6 @@ public class ConnieHandler implements Handler<ServerWebSocket> {
 	}
 
 	private Object toJson(Object object, boolean detailed) {
-		return taRouteService.getSerializer().toJson(object, detailed);
+		return serializer.toJson(object, detailed);
 	}
 }

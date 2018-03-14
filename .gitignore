@@ -16,3 +16,5 @@ http-server/rc/*
 /src/site/.Ulysses-Group.plist
 /src/site/.Ulysses-favorites.plist
 **/out/
+
+logs/*

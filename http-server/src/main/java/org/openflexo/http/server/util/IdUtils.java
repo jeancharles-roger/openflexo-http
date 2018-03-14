@@ -44,12 +44,6 @@ import java.util.Base64.Encoder;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.openflexo.foundation.FlexoObject;
-import org.openflexo.foundation.InnerResourceData;
-import org.openflexo.foundation.resource.FlexoResource;
-import org.openflexo.foundation.resource.ResourceData;
-import org.openflexo.foundation.technologyadapter.TechnologyAdapter;
-import org.openflexo.http.server.core.TechnologyAdapterRouteService;
 
 /**
  * Created by charlie on 07/02/2017.
@@ -60,56 +54,12 @@ public class IdUtils {
 	private final static Decoder urlDecoder = Base64.getUrlDecoder();
 
 	public static String getId(Object object) {
-		if (object instanceof FlexoResource) {
-			return IdUtils.encodeuri(((FlexoResource) object).getURI());
-		}
-		if (object instanceof FlexoObject) {
-			long flexoID = ((FlexoObject) object).getFlexoID();
-			return flexoID >= 0 ? Long.toString(flexoID) : null;
-		}
+
 		return null;
 	}
 
-	public static String getUrl(Object object, TechnologyAdapterRouteService service) {
-		FlexoResource resource = null;
-		long id = -1;
-
-		if (object instanceof FlexoResource) {
-			resource = (FlexoResource) object;
-		} else if (object instanceof ResourceData) {
-			resource = ((ResourceData) object).getResource();
-		} else if (object instanceof InnerResourceData) {
-			ResourceData resourceData = ((InnerResourceData) object).getResourceData();
-			resource = resourceData != null ? resourceData.getResource() : null;
-		}
-
-		if (object instanceof FlexoObject) {
-			id = ((FlexoObject) object).getFlexoID();
-		}
-
-		if (resource == null) return null;
-
-		if (id >= 0) {
-			String prefix = service.getPrefix(resource);
-			if (prefix == null)
-				return null;
-
-			StringBuilder url = new StringBuilder();
-			url.append(prefix);
-			url.append("/");
-			url.append(IdUtils.encodeuri(resource.getURI()));
-			if (id >= 0) {
-				url.append("/object/");
-				url.append(id);
-			}
-
-			return url.toString();
-		} else {
-			StringBuilder url = new StringBuilder();
-			url.append("/resource/");
-			url.append(IdUtils.encodeuri(resource.getURI()));
-			return url.toString();
-		}
+	public static String getUrl(Object object) {
+		return null;
 	}
 
 	public static String encodeuri(String uri) {
@@ -160,10 +110,6 @@ public class IdUtils {
 		}
 		if (id.length() == 0) throw new IllegalArgumentException("Sanitized id is empty from '" + rawId +"'");
 		return id.toString();
-	}
-
-	public static String getTechnologyAdapterId(TechnologyAdapter adapter) {
-		return sanitiseId(adapter.getIdentifier());
 	}
 
 }

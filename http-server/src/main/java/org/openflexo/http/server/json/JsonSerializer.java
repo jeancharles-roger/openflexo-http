@@ -70,6 +70,8 @@
 
 package org.openflexo.http.server.json;
 
+import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -79,12 +81,8 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
+import javassist.util.proxy.ProxyObject;
 import org.openflexo.connie.type.TypeUtils;
-import org.openflexo.foundation.fml.FMLObject;
-import org.openflexo.foundation.resource.FlexoResource;
-import org.openflexo.foundation.resource.ResourceData;
-import org.openflexo.http.server.core.TechnologyAdapterRouteService;
 import org.openflexo.http.server.util.IdUtils;
 import org.openflexo.model.ModelEntity;
 import org.openflexo.model.ModelProperty;
@@ -97,10 +95,6 @@ import org.openflexo.model.exceptions.ModelDefinitionException;
 import org.openflexo.model.factory.ModelFactory;
 import org.openflexo.model.factory.ProxyMethodHandler;
 
-import io.vertx.core.json.JsonArray;
-import io.vertx.core.json.JsonObject;
-import javassist.util.proxy.ProxyObject;
-
 /**
  * An instance of JsonSerializer transforms Pamela object to JSON object. The JSON result only contains the object destined to a REST
  * service.
@@ -111,14 +105,11 @@ public class JsonSerializer {
 	private final Set<CloningStrategy.StrategyType> cloningStrategies = Stream
 			.of(CloningStrategy.StrategyType.CLONE, CloningStrategy.StrategyType.CUSTOM_CLONE).collect(Collectors.toSet());
 
-	private final TechnologyAdapterRouteService service;
-
 	private final List<JsonComplement> complements = new ArrayList<>();
 
 	private final List<StringEncoder> encoders = new ArrayList<>();
 
-	public JsonSerializer(TechnologyAdapterRouteService service) {
-		this.service = service;
+	public JsonSerializer() {
 		initialize();
 	}
 
@@ -168,7 +159,7 @@ public class JsonSerializer {
 		else if (findEncoder(object.getClass()) != null) {
 			try {
 				StringEncoder encoder = findEncoder(object.getClass());
-				return encoder.toString(object);
+				return encoder != null ? encoder.toString(object) : null;
 			} catch (InvalidDataException e) {
 				return null;
 			}
@@ -181,10 +172,6 @@ public class JsonSerializer {
 				return toReferenceArray((Collection<?>) object);
 			}
 			return toArray((Collection<?>) object, detailed);
-		}
-		else if (object instanceof FlexoResource) {
-			return JsonUtils.getResourceDescription((FlexoResource<?>) object, service);
-
 		}
 		else {
 			JsonObject result = new JsonObject();
@@ -229,13 +216,9 @@ public class JsonSerializer {
 	private boolean identifyObject(Object object, JsonObject result) {
 		String id = IdUtils.getId(object);
 
-		if (object instanceof FMLObject) {
-			result.put("name", ((FMLObject) object).getName());
-		}
-
 		if (id != null) {
 			result.put("id", id);
-			String url = IdUtils.getUrl(object, service);
+			String url = IdUtils.getUrl(object);
 			if (url != null) {
 				result.put("url", url);
 			}
@@ -256,22 +239,12 @@ public class JsonSerializer {
 		return object.getClass().getSimpleName();
 	}
 
-	private final boolean isReference(ModelProperty<?> property) {
-		if (!cloningStrategies.contains(property.getCloningStrategy()))
-			return true;
-		return property.getEmbedded() == null && property.getComplexEmbedded() != null && property.getXMLElement() == null;
+	private boolean isReference(ModelProperty<?> property) {
+		return 	!cloningStrategies.contains(property.getCloningStrategy()) ||
+				property.getEmbedded() == null && property.getComplexEmbedded() != null && property.getXMLElement() == null;
 	}
 
 	public void describeObject(Object object, JsonObject result, boolean detailed) {
-
-		// adds resource link
-		if (object instanceof ResourceData) {
-			FlexoResource<?> resource = ((ResourceData<?>) object).getResource();
-			String resourceUrl = IdUtils.getUrl(resource, service);
-			if (resourceUrl != null) {
-				result.put("resourceUrl", resourceUrl);
-			}
-		}
 
 		if (object instanceof ProxyObject) {
 			ProxyMethodHandler<?> handler = (ProxyMethodHandler<?>) ((ProxyObject) object).getHandler();
@@ -282,7 +255,7 @@ public class JsonSerializer {
 				if (detailed) {
 					Iterator<ModelProperty<? super Object>> iterator = modelEntity.getProperties();
 					while (iterator.hasNext()) {
-						ModelProperty property = iterator.next();
+						ModelProperty<Object> property = iterator.next();
 
 						XMLAttribute xmlAttribute = property.getXMLAttribute();
 						XMLElement xmlElement = property.getXMLElement();
@@ -307,13 +280,13 @@ public class JsonSerializer {
 							boolean reference = isReference(property);
 							switch (property.getCardinality()) {
 								case SINGLE: {
-									transformed = toJson(propertyValue, reference, detailed);
+									transformed = toJson(propertyValue, reference, true);
 									break;
 								}
 								case LIST: {
 									List<Object> collected = new ArrayList<>();
 									for (Object child : (List<?>) propertyValue) {
-										collected.add(toJson(child, reference, detailed));
+										collected.add(toJson(child, reference, true));
 									}
 									if (!collected.isEmpty()) {
 										transformed = new JsonArray(collected);

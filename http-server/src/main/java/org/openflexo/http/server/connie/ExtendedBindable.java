@@ -36,7 +36,6 @@
 package org.openflexo.http.server.connie;
 
 import java.util.Map;
-
 import org.openflexo.connie.Bindable;
 import org.openflexo.connie.BindingFactory;
 import org.openflexo.connie.BindingModel;
@@ -44,9 +43,6 @@ import org.openflexo.connie.BindingVariable;
 import org.openflexo.connie.DataBinding;
 import org.openflexo.connie.DefaultBindable;
 import org.openflexo.connie.java.JavaBindingFactory;
-import org.openflexo.foundation.fml.FMLObject;
-import org.openflexo.foundation.fml.binding.FMLBindingFactory;
-import org.openflexo.foundation.fml.rt.FlexoConceptInstance;
 
 public class ExtendedBindable extends DefaultBindable {
 
@@ -68,12 +64,6 @@ public class ExtendedBindable extends DefaultBindable {
 	}
 
 	private static BindingFactory createFactory(Bindable parentBindable) {
-		if (parentBindable instanceof FMLObject) {
-			return new FMLBindingFactory(((FMLObject) parentBindable).getDeclaringVirtualModel());
-		}
-		if (parentBindable instanceof FlexoConceptInstance) {
-			return new FMLBindingFactory(((FlexoConceptInstance) parentBindable).getFlexoConcept().getDeclaringVirtualModel());
-		}
 		return new JavaBindingFactory();
 	}
 
