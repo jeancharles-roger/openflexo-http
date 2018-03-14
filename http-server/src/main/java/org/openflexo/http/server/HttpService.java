@@ -9,8 +9,10 @@ import io.vertx.ext.web.handler.CorsHandler;
 import io.vertx.ext.web.handler.LoggerHandler;
 import io.vertx.ext.web.handler.StaticHandler;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.openflexo.connie.DataBinding;
@@ -32,7 +34,7 @@ public class HttpService {
 
 	private HttpServer server = null;
 
-	private final List<ObjectFinder> finders = new ArrayList<>();
+	private final Set<ObjectFinder> finders = new LinkedHashSet<>();
 
 	private long lastHeapPrint = -1L;
 
@@ -48,6 +50,10 @@ public class HttpService {
 		this.host = options.host;
 		serverOptions = new HttpServerOptions();
 		serverOptions.setCompressionSupported(true);
+	}
+
+	public void registerFinder(ObjectFinder finder) {
+		finders.add(finder);
 	}
 
 	private void printHeapHandler(RoutingContext context) {
@@ -107,12 +113,7 @@ public class HttpService {
 
 		server = vertx.createHttpServer(serverOptions);
 		server.requestHandler(router::accept);
-		server.websocketHandler(new ConnieHandler(new ObjectFinder() {
-			@Override
-			public <T> T find(Class<T> type, String resourceId, String objectId) {
-				return null;
-			}
-		}, new JsonSerializer()));
+		server.websocketHandler(new ConnieHandler(finders, new JsonSerializer()));
 
 		logger.info("Starting HTTP Server on " + host + ":" + port);
 		server.listen(port, host);

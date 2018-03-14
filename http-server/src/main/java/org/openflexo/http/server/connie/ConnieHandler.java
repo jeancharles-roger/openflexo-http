@@ -61,7 +61,7 @@ import org.openflexo.http.server.util.IdUtils;
  */
 public class ConnieHandler implements Handler<ServerWebSocket> {
 
-	private final ObjectFinder finder;
+	private final Set<ObjectFinder> finders;
 
 	private final JsonSerializer serializer;
 
@@ -69,8 +69,8 @@ public class ConnieHandler implements Handler<ServerWebSocket> {
 
 	private final Set<ClientConnection> clients = new HashSet<>();
 
-	public ConnieHandler(ObjectFinder finder, JsonSerializer serializer) {
-		this.finder = finder;
+	public ConnieHandler(Set<ObjectFinder> finders, JsonSerializer serializer) {
+		this.finders = finders;
 		this.serializer = serializer;
 	}
 
@@ -108,7 +108,10 @@ public class ConnieHandler implements Handler<ServerWebSocket> {
 			String objectUrl = url.substring(indexOfInfix + objectInfix.length());
 
 			String resourceUri = IdUtils.decodeId(resourceId);
-			return finder.find(type, resourceId, objectUrl);
+			for (ObjectFinder finder : finders) {
+				Object found = finder.find(type, resourceUri, objectUrl);
+				if (type.isInstance(found)) return type.cast(found);
+			}
 		}
 		return null;
 	}
